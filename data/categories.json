@@ -1,0 +1,477 @@
+{
+  "categories": [
+    {
+      "category": "Food & Dining",
+      "subcategories": [
+        {
+          "subcategory": "Restaurant",
+          "type_tag": "Eating Out",
+          "keywords": [
+            "ADYAR ANANDA BHAVAN", "SHERATON", "PASTA STREET", "LEON GRILL",
+            "BABAI HOTEL", "ARUNAGIRI", "RESTAURANT", "CAFE CENTRAL", "PAZHANI",
+            "LUNCH", "DINNER", "MEALS", "RAJESH TIFFIN CENTER", "BREAKFAST",
+            "CAFE AND BAKERS", "PIZZA", "BIRYANI", "biryan", "McDonalds",
+            "MCDONALD", "SNACKS", "WAFFLE", "COCONUT WATER", "Snacks",
+            "SIMPLIFY VITALITY", "CLOUDKITCH", "TINDIVANAM", "SATHEESH",
+            "Q314709983"
+          ]
+        },
+        {
+          "subcategory": "Delivery",
+          "type_tag": "Delivery",
+          "keywords": ["Swiggy", "SWIGGY", "Zomato", "ZOMATO"]
+        },
+        {
+          "subcategory": "Party",
+          "type_tag": "Party",
+          "keywords": ["SATHEESH", "PARTY", "CELEBRATION"]
+        },
+        {
+          "subcategory": "Others",
+          "type_tag": "Misc",
+          "keywords": ["SIMPLIFY VITALITY", "TINDIVANAM"]
+        }
+      ]
+    },
+    {
+      "category": "Shopping",
+      "subcategories": [
+        
+        {
+          "subcategory": "Household",
+          "type_tag": "Amazon",
+          "keywords": [
+            "AMAZON PAY", "AMAZONIN", "AMAZON INDIA", "AMAZON",
+             "BLINK", "SMART POINT", "COMB"
+          ]
+        },
+        {
+          "subcategory": "Cloths",
+          "type_tag": "Misc",
+          "keywords": [
+            "Adidas", "ADIDAS", "LIFE STYLE", "LIFESTYLESTORES", "LIFESTYLE",
+            "CULT.ESBZ", "FIRSTCRY", "FIRSTCRY1", "DSI WHITEFIELD", "Pepe Jeans India L",
+            "PEPE JEANS", "MYNTRA", "Myntra","MINISO","RETAIL","HYPERMARKET"
+          ]
+        },
+        {
+          "subcategory": "Running",
+          "type_tag": "Shoes",
+          "keywords": [
+            "PUMA", "SHOPPERS STOP", "Shoes", "SHOES", "ALL Sports"
+          ]
+        },
+        {
+          "subcategory": "Furniture",
+          "type_tag": "Misc",
+          "keywords": ["RAZ*DeckUp", "DECKUP", "FURNITURE"]
+        },
+        {
+          "subcategory": "Alcohol",
+          "type_tag": "Misc",
+          "keywords": ["Wines", "WINES", "ALCOHOL", "LIQUOR", "BEER"]
+        },
+       
+        {
+          "subcategory": "Gift",
+          "type_tag": "Misc",
+          "keywords": ["Hamleys", "HAMLEYS", "GIFT"]
+        },
+        {
+          "subcategory": "Gold Ring",
+          "type_tag": "Misc",
+          "keywords": ["Gold Ring", "GOLD RING"]
+        },
+        {
+          "subcategory": "Others",
+          "type_tag": "Misc",
+          "keywords": [
+            "Bata", "BATA", "NEXUS SHANTINIK", "ALL Sports","IDOL"
+          ]
+        }
+      ]
+    },
+    {
+      "category": "Travel",
+      "subcategories": [
+        {
+          "subcategory": "Stay",
+          "type_tag": "Hotel",
+          "keywords": [
+            "Agoda", "AGODA", "MAKE MY TRIP", "MAKEMYTRIP", "LEOASISAURORA",
+            "MANIKANDAN", "Sumit", "SUMIT PACHLANGIYA", 
+            "ACCOMMODATION", "Hotel", "HOTEL", "STAY", "RESORT"
+          ]
+        },
+        {
+          "subcategory": "Transport",
+          "type_tag": "Commute",
+          "keywords": [
+            "Abhibus", "ABHIBUS", "REDBUS", "UBER", "TAXI", "Taxi",
+            "Auto", "AUTO", "DHARMENDRA", "CAR PARK","651536"
+          ]
+        },
+        {
+          "subcategory": "Fuel",
+          "type_tag": "Vehicle",
+          "keywords": ["PETROL", "FUEL", "DIESEL", "CNG", "HP PETROL", "INDIAN OIL","BKPM SONS"]
+        }
+      ]
+    },
+    {
+      "category": "Health",
+      "subcategories": [
+        {
+          "subcategory": "Medical",
+          "type_tag": "Healthcare",
+          "keywords": [
+            "AARTHI SCANS", "Hospital", "HOSPITAL", "MEDICAL", "CHILDREN S CLIN",
+            "MADHAPURPS", "INSYNC", "KINESPHERE WELLNESS", "PHYSIO", "CLINIC",
+            "DOCTOR", "PHARMACY", "DIAGNOSTIC"
+          ]
+        },
+        {
+          "subcategory": "Medicine",
+          "type_tag": "Medicine",
+          "keywords": ["SUNPHARMA", "MEDICINE", "PHARMACY", "MEDPLUS", "APOLLO PHARMACY"]
+        },
+        {
+          "subcategory": "Insurance",
+          "type_tag": "Misc",
+          "keywords": ["POLICYBAZAAR", "HDFC ERGO BILLDESK", "INSURANCE", "LIC", "ICICI LOMBARD"]
+        },
+        {
+          "subcategory": "Protein Powder",
+          "type_tag": "Misc",
+          "keywords": ["FITSHIT", "PROTEIN", "SUPPLEMENT", "GNC", "MUSCLEBLAZE"]
+        }
+      ]
+    },
+    {
+      "category": "Entertainment",
+      "subcategories": [
+        {
+          "subcategory": "Movie",
+          "type_tag": "Misc",
+          "keywords": [
+            "BOOK MY SHOW", "BOOKMYSHOW", "BigtreeEntertainment", "BIGTREE",
+            "CINEPOLIS", "PVR", "INOX"
+          ]
+        },
+        {
+          "subcategory": "Leisure",
+          "type_tag": "Recreation",
+          "keywords": [
+            "TORQ", "BEACH", "Bouncy Castle", "FOOD AND GAMES",
+            "WATERSPORTS", "AMUSEMENT", "THEME PARK"
+          ]
+        },
+        {
+          "subcategory": "Celebration",
+          "type_tag": "Misc",
+          "keywords": ["cake", "CAKE", "DEEPAK", "BIRTHDAY", "ANNIVERSARY"]
+        },
+        {
+          "subcategory": "Others",
+          "type_tag": "Misc",
+          "keywords": [
+            "Airport Lou", "AIRPORT LOUNGE", "LOUNGE", "BigtreeEntertainment"
+          ]
+        }
+      ]
+    },
+    {
+      "category": "Utilities",
+      "subcategories": [
+        {
+          "subcategory": "Bills",
+          "type_tag": "Recurring",
+          "keywords": [
+            "BBPS Payment", "GOOGLEBBPSUTILITY", "UTILITY", "VINAYAKA BOOK STORE",
+            "ELECTRICITY", "WATER BILL", "GAS BILL", "BSES", "TATA POWER"
+          ]
+        },
+        {
+          "subcategory": "Mobile",
+          "type_tag": "Bills",
+          "keywords": [
+            "GPAYRECHARGE", "INFOCOM", "AIRTEL", "VODAFONE", "JIO", "BSNL",
+            "MOBILE RECHARGE", "BROADBAND"
+          ]
+        },
+        {
+          "subcategory": "Broadband",
+          "type_tag": "Broadband",
+          "keywords": ["BROADBAND", "INTERNET", "FIBER", "ACT FIBERNET", "HATHWAY"]
+        }
+      ]
+    },
+    {
+      "category": "Financial",
+      "subcategories": [
+        {
+          "subcategory": "Transfer/Loan",
+          "type_tag": "Banking",
+          "keywords": [
+            "Home Loan", "BILLIONBRAINS", "GANNARAPU NARESH", "LOAN EMI",
+            "HOME LOAN EMI", "PERSONAL LOAN","Loan","Repayment","GAINDLA"
+          ]
+        },
+        {
+          "subcategory": "Credit Card Payment",
+          "type_tag": "Misc",
+          "keywords": [
+            "GPAY-CREDITCARD", "CREDITCARD PAYMENT", "CRED PAYMENT",
+            "NEFT CC", "AUTOPAY CC", "CC PAYMENT RECEIVED"
+          ]
+        },
+        {
+          "subcategory": "Interest",
+          "type_tag": "Banking",
+          "keywords": ["INTEREST", "Int.Pd", "INT PD", "INTEREST PAID"]
+        }
+      ]
+    },
+    {
+      "category": "Investment",
+      "subcategories": [
+        {
+          "subcategory": "MF",
+          "type_tag": "Misc",
+          "keywords": [
+            "Indian Clearing Corp", "Groww", "GROWW", "MUTUAL FUND",
+            "SIP", "ZERODHA", "KITE", "MF REDEMPTION", "CAMS", "KARVY"
+          ]
+        }
+      ]
+    },
+
+    {
+      "category": "Banking",
+      "subcategories": [
+        {
+          "subcategory": "Interest",
+          "type_tag": "Misc",
+          "keywords": ["Int.Pd", "INT PD", "INTEREST CREDITED", "FD INTEREST"]
+        },
+        {
+          "subcategory": "Charges",
+          "type_tag": "Fees",
+          "keywords": [
+            "INSTAALERTCHG", "SERVICE CHARGE", "SMS CHARGES", "ANNUAL FEE",
+            "BANK CHARGES", "ATM CHARGE", "CHEQUE RETURN"
+          ]
+        }
+      ]
+    },
+    {
+      "category": "Incoming",
+      "subcategories": [
+        {
+          "subcategory": "Salary",
+          "type_tag": "Misc",
+          "keywords": ["Salary", "SALARY", "PAYROLL", "WAGES"]
+        },
+        {
+          "subcategory": "Received",
+          "type_tag": "Transfer In",
+          "keywords": [
+            "MSSAKKATHCOFFEEGURU", "CN Mart", 
+            "RECEIVED"
+          ]
+        }
+      ]
+    },
+    {
+      "category": "Kids",
+      "subcategories": [
+        {
+          "subcategory": "School",
+          "type_tag": "Fee",
+          "keywords": ["Green Wood", "GREEN WOOD", "SCHOOL FEE", "TUITION"]
+        },
+        {
+          "subcategory": "Classes",
+          "type_tag": "Yoga",
+          "keywords": [
+            "NEHA", "SOUNTHARI",
+            "YOGA", "MUSIC CLASS", "DANCE CLASS", "CLASSES","9886354933"
+          ]
+        },
+        {
+          "subcategory": "Shopping",
+          "type_tag": "Books",
+          "keywords": ["Kids2day", "KIDS2DAY", "CHILDREN", "KIDS SHOP"]
+        },
+        {
+          "subcategory": "Stationary",
+          "type_tag": "Misc",
+          "keywords": ["Prints", "Stationary", "STATIONARY", "STATIONERY", "NOTEBOOK", "PENCIL"]
+        }
+      ]
+    },
+    {
+      "category": "Activities",
+      "subcategories": [
+        {
+          "subcategory": "Running",
+          "type_tag": "Races",
+          "keywords": ["RAZ*PROCAM", "PROCAM", "KHELOMORE", "CLICK2RACE", "MARATHON", "RACE"]
+        },
+        {
+          "subcategory": "Gym",
+          "type_tag": "Misc",
+          "keywords": ["BARSHA GUHA", "GYM", "FITNESS", "CULT.FIT", "CULT FIT"]
+        },
+        {
+          "subcategory": "Coach",
+          "type_tag": "Recreation",
+          "keywords": ["MURALI GADDAM", "COACH", "TRAINER", "TRAINING FEE"]
+        }
+      ]
+    },
+    {
+      "category": "Construction",
+      "subcategories": [
+        {
+          "subcategory": "Labour",
+          "type_tag": "Misc",
+          "keywords": [
+            "JILLAPELLY", "SUDARSHAN", "LABOUR", "CONTRACTOR",
+            "WORKER", "MASON"
+          ]
+        },
+        {
+          "subcategory": "Material",
+          "type_tag": "Misc",
+          "keywords": [
+            "TRADERS", "IRON AND HARDWAR", "HARDWARE",
+            "CEMENT", "SAND", "TILES", "PAINT", "IRON", "STEEL"
+          ]
+        },
+        {
+          "subcategory": "Tea",
+          "type_tag": "Misc",
+          "keywords": ["Mokenapelly", "TEA EXPENSE", "REFRESHMENTS CONSTRUCTION"]
+        },
+        {
+          "subcategory": "Misc",
+          "type_tag": "Misc",
+          "keywords": ["LINGAPURAM"]
+        }
+      ]
+    },
+    {
+      "category": "Personal",
+      "subcategories": [
+        {
+          "subcategory": "Grooming",
+          "type_tag": "Misc",
+          "keywords": [
+            "VINOD KUMAR L", "VINOD", "SAIS HAIR CASTLE", "SALON",
+            "BARBER", "HAIRCUT", "GROOMING", "BEAUTY"
+          ]
+        },
+        {
+          "subcategory": "Massage",
+          "type_tag": "Misc",
+          "keywords": ["URBAN COMPANY", "MASSAGE", "SPA", "WELLNESS"]
+        },
+        {
+          "subcategory": "Running",
+          "type_tag": "Races",
+          "keywords": ["KHELOMORE", "CLICK2RACE"]
+        }
+      ]
+    },
+    {
+      "category": "Subscription",
+      "subcategories": [
+        {
+          "subcategory": "Menstrupedia",
+          "type_tag": "Misc",
+          "keywords": ["Purchasedtrubuddy", "MENSTRUPEDIA", "SUBSCRIPTION"]
+        },
+        {
+          "subcategory": "Streaming",
+          "type_tag": "Misc",
+          "keywords": ["NETFLIX", "HOTSTAR", "AMAZON PRIME", "SPOTIFY", "YOUTUBE PREMIUM"]
+        }
+      ]
+    },
+    {
+      "category": "Education",
+      "subcategories": [
+        {
+          "subcategory": "Online Course",
+          "type_tag": "Learning",
+          "keywords": ["UDEMY", "COURSERA", "SKILL SHARE", "UNACADEMY", "BYJUS"]
+        }
+      ]
+    },
+    {
+      "category": "HouseHold",
+      "subcategories": [
+        {
+          "subcategory": "Groceries",
+          "type_tag": "Household",
+          "keywords": [
+            "BIGBASKET", "BBNOW", "BBDAILY", "BB DAILY", "INNOVATIVE RETAIL",
+            "FRESHTOHOME", "FRESH MART", "MINI MARKET", "THE BEE STORY",
+            "FIRST CLUB", "FIRSTCLUB", "Zepto", "ZEPTO", "milk", "MILK",
+            "GROCERIES", "General Store", "NUTS", "STAR BAZAAR",
+            "AMAZON PAY GROCERIES","SUPERMARTS"
+          ]
+        },
+        {
+          "subcategory": "Maintenance",
+          "type_tag": "Recreation",
+          "keywords": [
+            "ADDA", "MAINTENANCE", "SOCIETY", "APARTMENT", "HOUSING SOCIETY"
+          ]
+        },
+        {
+          "subcategory": "Rent",
+          "type_tag": "Misc",
+          "keywords": ["Pigeon Net", "RENT", "RENTAL", "HOUSE RENT", "FLAT RENT", "CNRB0000001"]
+        }
+      ]
+    },
+    {
+      "category": "Misc",
+      "subcategories": [
+        {
+          "subcategory": "Peer Transfer",
+          "type_tag": "Misc",
+          "keywords": ["FRIDGE MAGNETS", "MANJUMANJU23988", "PEER TRANSFER"]
+        }
+      ]
+    },
+    {
+      "category": "Personal/Transfer",
+      "subcategories": [
+        
+        {
+          "subcategory": "Finance",
+          "type_tag": "Chitti",
+          "keywords": ["NALLA"]
+        }
+      ]
+    },
+    {
+      "category": "Others",
+      "subcategories": [
+        {
+          "subcategory": "Misc",
+          "type_tag": "Car Clean",
+          "keywords": ["MANJUNATHA", "CAR WASH", "CAR CLEAN"]
+        },
+        {
+          "subcategory": "Peer Transfer",
+          "type_tag": "Iron",
+          "keywords": ["MANJUMANJU23988","MANJUNATHA"]
+        }
+      ]
+    }
+  ]
+}

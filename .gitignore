@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Database files
+data/finance.db
+data/finance.db-shm
+data/finance.db-wal
+
+# Secrets
+.env
+
+# Claude Code memory / session files
+.claude/
