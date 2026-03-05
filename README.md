@@ -84,6 +84,33 @@ Approved pairs are excluded from Dashboard expense totals automatically.
 ### 3. Categorise
 Browse all transactions, correct categories, and trigger LLM re-categorisation. Category assignments are soft-overridden (`final_category`) without touching the auto-detected values.
 
+### Categories (`data/categories.json`)
+
+Categories and their keywords are defined in `data/categories.json`. The file ships with 21 pre-seeded categories (Food & Dining, Travel, Shopping, Utilities, Investment, etc.), each with subcategories and keyword lists used by the auto-categorisation engine.
+
+**To customise categories**, edit `data/categories.json` directly:
+
+```jsonc
+{
+  "categories": [
+    {
+      "category": "Food & Dining",
+      "subcategories": [
+        {
+          "subcategory": "Delivery",
+          "type_tag": "Delivery",
+          "keywords": ["Swiggy", "Zomato", "YOUR_APP"]   // ← add your keywords here
+        }
+      ]
+    }
+  ]
+}
+```
+
+You can also manage keywords through **Settings → Categories** in the UI without editing the file directly.
+
+**Alternatively, enable the LLM** (Settings → LLM Configuration) to have Claude, GPT-4o, or Llama automatically categorise transactions that don't match any keyword — useful when your statements contain merchant names not yet in the keyword list.
+
 ### 4. Dashboard
 See [Dashboard Overview](#dashboard-overview) below.
 
