@@ -1,7 +1,6 @@
 """
 pages/4_Dashboard.py
-Full analytics dashboard with Plotly charts, KPI bar, and insights panel.
-Supports drill-through filtering: click any chart label to filter transactions.
+Clean, insight-focused personal finance dashboard.
 """
 import streamlit as st
 import pandas as pd
@@ -9,7 +8,7 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 st.set_page_config(
     page_title="Dashboard | Finance Tracker",
@@ -18,19 +17,24 @@ st.set_page_config(
 )
 
 from core.database import get_transactions, get_loan_tags, get_budgets, init_db
-from core.categorisation import get_effective_category
 from core.ui_helpers import render_sidebar_stats
 
 init_db()
-render_sidebar_stats()
 
-# ── Colour palette ─────────────────────────────────────────────────────────────
-PALETTE = [
-    "#7cb47c", "#8b6fba", "#d4a843", "#d4889a", "#4e8bc4",
-    "#e07b4a", "#5dbfbf", "#b07eb0", "#a4c74a", "#e0c45c",
+# ── Colour tokens ───────────────────────────────────────────────────────────────
+C_INCOME  = "#10B981"   # emerald
+C_EXPENSE = "#EF4444"   # red
+C_SAVINGS = "#3B82F6"   # blue
+C_INVEST  = "#8B5CF6"   # violet
+C_NEUTRAL = "#6B7280"   # grey
+
+CAT_COLORS = [
+    "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
+    "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1",
+    "#14B8A6", "#F43F5E", "#A78BFA", "#34D399", "#FB923C",
 ]
 
-# ── Drill-through state ────────────────────────────────────────────────────────
+# ── Drill-through state ─────────────────────────────────────────────────────────
 if "drill" not in st.session_state:
     st.session_state["drill"] = {}
 
@@ -43,409 +47,323 @@ def _clear_drill() -> None:
     st.session_state["drill"] = {}
 
 
-# ── Helper ─────────────────────────────────────────────────────────────────────
-def ensure_date(val):
-    if val is None:
-        return None
-    if isinstance(val, datetime):
-        return val.date()
-    if isinstance(val, date):
-        return val
-    try:
-        return pd.to_datetime(val).date()
-    except Exception:
-        return None
-
-
+# ── Data helpers ────────────────────────────────────────────────────────────────
 def build_df(
     txs: List[Dict],
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start: Optional[date] = None,
+    end: Optional[date] = None,
     accounts: Optional[List[str]] = None,
-    categories: Optional[List[str]] = None,
-    exclude_reconciled: bool = True,
-    show_mode: str = "expenses",  # "all" | "expenses" | "income"
-    months: Optional[List[str]] = None,  # e.g. ["2024-01", "2024-03"]
+    excl_recon: bool = True,
 ) -> pd.DataFrame:
     if not txs:
         return pd.DataFrame()
-
     df = pd.DataFrame(txs)
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df = df.dropna(subset=["date"])
-
-    if start_date:
-        df = df[df["date"].dt.date >= start_date]
-    if end_date:
-        df = df[df["date"].dt.date <= end_date]
+    if start:
+        df = df[df["date"].dt.date >= start]
+    if end:
+        df = df[df["date"].dt.date <= end]
     if accounts:
         df = df[df["account_name"].isin(accounts)]
-
-    # Effective category — vectorized (much faster than row-wise apply)
-    df["eff_category"] = (
-        df["final_category"].replace("", None).fillna(
-            df["category"].replace("", None)
-        ).fillna("Uncategorised")
-    )
-    df["eff_subcategory"] = (
-        df["final_subcategory"].replace("", None).fillna(
-            df["subcategory"].replace("", None)
-        ).fillna("Misc")
-    )
-
-    if categories:
-        df = df[df["eff_category"].isin(categories)]
-
-    if exclude_reconciled:
+    if excl_recon:
         df = df[~df["reconciliation_status"].isin(
             ["transfer_approved", "cc_payment_approved"]
         )]
-
-    if show_mode == "expenses":
-        df = df[df["net_amount"] < 0]
-    elif show_mode == "income":
-        df = df[df["net_amount"] > 0]
-
-    df["month"] = df["date"].dt.to_period("M").astype(str)
-    if months:
-        df = df[df["month"].isin(months)]
-    df["month_dt"] = df["date"].dt.to_period("M").dt.to_timestamp()
+    df["eff_category"] = (
+        df["final_category"].replace("", None)
+        .fillna(df["category"].replace("", None))
+        .fillna("Uncategorised")
+    )
+    df["eff_subcategory"] = (
+        df["final_subcategory"].replace("", None)
+        .fillna(df["subcategory"].replace("", None))
+        .fillna("Misc")
+    )
+    df["month"]     = df["date"].dt.to_period("M").astype(str)
     df["abs_amount"] = df["net_amount"].abs()
     return df
 
 
-# ── Page start ─────────────────────────────────────────────────────────────────
-st.title("📊 Dashboard")
-st.info("Use the sidebar filters to slice your data. Click any chart label to drill into transactions.")
+def delta_label(curr: float, prior: float) -> Optional[float]:
+    if prior == 0:
+        return None
+    return round((curr - prior) / abs(prior) * 100, 1)
 
-# ── Load data ──────────────────────────────────────────────────────────────────
+
+# ── Load data ───────────────────────────────────────────────────────────────────
+render_sidebar_stats()
+
 all_txs = get_transactions()
-
 if not all_txs:
-    st.warning("No transactions found. Upload some statements on the Upload page.")
+    st.title("📊 Dashboard")
+    st.warning("No transactions found. Upload some statements first.")
     st.stop()
 
 all_df_raw = pd.DataFrame(all_txs)
 all_df_raw["date"] = pd.to_datetime(all_df_raw["date"], errors="coerce")
 all_df_raw = all_df_raw.dropna(subset=["date"])
 
-# ── Sidebar filters ────────────────────────────────────────────────────────────
+# ── Sidebar ─────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 🔍 Filters")
 
-    min_date = all_df_raw["date"].min().date()
-    max_date = all_df_raw["date"].max().date()
-    default_start = date(max_date.year, 1, 1)
+    min_dt = all_df_raw["date"].min().date()
+    max_dt = all_df_raw["date"].max().date()
+    default_start = date(max_dt.year, 1, 1)
 
     date_range = st.date_input(
         "Date Range",
-        value=(default_start, max_date),
-        min_value=min_date,
-        max_value=max_date,
-        key="dash_date_range",
+        value=(default_start, max_dt),
+        min_value=min_dt,
+        max_value=max_dt,
+        key="dash_date",
     )
     if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-        start_date, end_date = date_range[0], date_range[1]
+        start_date, end_date = date_range
     else:
-        start_date, end_date = default_start, max_date
+        start_date, end_date = default_start, max_dt
 
-    all_accounts = sorted(all_df_raw["account_name"].dropna().unique().tolist())
+    all_accounts = sorted(all_df_raw["account_name"].dropna().unique())
     sel_accounts = st.multiselect(
-        "Accounts", options=all_accounts, default=all_accounts, key="dash_accounts"
+        "Accounts", all_accounts, default=all_accounts, key="dash_accs"
     )
 
-    all_cats_raw = (
-        all_df_raw["final_category"].replace("", None)
-        .fillna(all_df_raw["category"].replace("", None))
-        .fillna("Uncategorised")
-        .unique()
+    excl_recon = st.toggle(
+        "Exclude reconciled transactions", value=True, key="dash_excl"
     )
-    all_cats = sorted(all_cats_raw.tolist())
-    sel_cats = st.multiselect(
-        "Categories", options=all_cats, default=all_cats, key="dash_cats"
-    )
-
-    # Month selector (derived from data within the date range)
-    months_in_range = sorted(set(
-        all_df_raw[
-            (all_df_raw["date"].dt.date >= start_date) &
-            (all_df_raw["date"].dt.date <= end_date)
-        ]["date"].dt.to_period("M").astype(str).tolist()
-    ))
-    sel_months = st.multiselect(
-        "Months",
-        options=months_in_range,
-        default=[],
-        key="dash_months",
-        help="Pick specific months. Leave empty to include all months in the date range.",
-    )
-
-    excl_reconciled = st.toggle("Exclude reconciled transactions", value=True, key="dash_excl_recon")
-    show_mode = st.radio(
-        "Show", ["expenses", "income", "all"], index=0, key="dash_show_mode",
-        format_func=lambda x: {"expenses": "Expenses only", "income": "Income only", "all": "All"}[x]
+    excl_invest = st.toggle(
+        "Exclude Investments from expenses",
+        value=False,
+        key="dash_excl_invest",
+        help=(
+            "When ON, Investment category is removed from expense totals and charts. "
+            "Investments are shown separately in the KPI bar."
+        ),
     )
 
     st.markdown("---")
     if st.session_state["drill"]:
-        if st.button("✕ Clear drill-through filter", use_container_width=True):
+        if st.button("✕ Clear drill-through", use_container_width=True):
             _clear_drill()
             st.rerun()
 
-
-# Build filtered df
+# ── Build dataframes ─────────────────────────────────────────────────────────────
 df = build_df(
     all_txs,
-    start_date=start_date,
-    end_date=end_date,
+    start=start_date,
+    end=end_date,
     accounts=sel_accounts or None,
-    categories=sel_cats or None,
-    exclude_reconciled=excl_reconciled,
-    show_mode="all",  # We use all for income/expense split below
-    months=sel_months or None,
+    excl_recon=excl_recon,
 )
 
 if df.empty:
+    st.title("📊 Dashboard")
     st.warning("No transactions match the current filters.")
     st.stop()
 
+income_df  = df[df["net_amount"] > 0].copy()
 expense_df = df[df["net_amount"] < 0].copy()
-income_df = df[df["net_amount"] > 0].copy()
+invest_df  = expense_df[expense_df["eff_category"] == "Investment"].copy()
 
-if show_mode == "expenses":
-    chart_df = expense_df
-elif show_mode == "income":
-    chart_df = income_df
-else:
-    chart_df = df
-
-# ── Prior period (for delta calculations) ────────────────────────────────────
-period_days = (end_date - start_date).days
-prior_start = start_date - timedelta(days=period_days)
-prior_end = start_date - timedelta(days=1)
-
-prior_df = build_df(
-    all_txs,
-    start_date=prior_start,
-    end_date=prior_end,
-    exclude_reconciled=excl_reconciled,
-    show_mode="all",
-    # No month filter on prior period — always compare full prior window
+# View used for charts / KPIs — optionally strips Investment
+expense_view = (
+    expense_df[expense_df["eff_category"] != "Investment"].copy()
+    if excl_invest
+    else expense_df.copy()
 )
-prior_expense = prior_df[prior_df["net_amount"] < 0]["net_amount"].abs().sum()
 
-# ── KPI functions ──────────────────────────────────────────────────────────────
-def get_cat_spend(df: pd.DataFrame, cat: str) -> float:
-    return df[df["eff_category"] == cat]["net_amount"].abs().sum() if not df.empty else 0.0
+# ── Prior period ─────────────────────────────────────────────────────────────────
+period_days = max((end_date - start_date).days, 1)
+prior_end   = start_date - timedelta(days=1)
+prior_start = prior_end  - timedelta(days=period_days - 1)
+prior_df    = build_df(all_txs, start=prior_start, end=prior_end, excl_recon=excl_recon)
+prior_expense_df = prior_df[prior_df["net_amount"] < 0].copy() if not prior_df.empty else pd.DataFrame()
+if excl_invest and not prior_expense_df.empty:
+    prior_expense_df = prior_expense_df[prior_expense_df["eff_category"] != "Investment"]
 
-def get_prior_cat_spend(cat: str) -> float:
-    return get_cat_spend(prior_df[prior_df["net_amount"] < 0], cat) if not prior_df.empty else 0.0
+# ── KPI values ───────────────────────────────────────────────────────────────────
+total_income  = income_df["net_amount"].sum()
+total_expense = expense_view["net_amount"].abs().sum()
+invest_total  = invest_df["net_amount"].abs().sum()
+net_savings   = total_income - expense_df["net_amount"].abs().sum()   # always subtract all exp
+savings_rate  = (net_savings / total_income * 100) if total_income > 0 else 0.0
 
-def delta_pct(current: float, prior: float) -> Optional[float]:
-    if prior == 0:
-        return None
-    return round((current - prior) / prior * 100, 1)
+prior_income   = prior_df[prior_df["net_amount"] > 0]["net_amount"].sum() if not prior_df.empty else 0
+prior_exp_val  = prior_expense_df["net_amount"].abs().sum() if not prior_expense_df.empty else 0
+prior_invest   = prior_expense_df[prior_expense_df["eff_category"] == "Investment"]["net_amount"].abs().sum() \
+    if (not prior_expense_df.empty and not excl_invest) else 0
+prior_savings  = prior_income - prior_df[prior_df["net_amount"] < 0]["net_amount"].abs().sum() \
+    if not prior_df.empty else 0
+prior_srate    = (prior_savings / prior_income * 100) if prior_income > 0 else 0
 
-
-total_spend = expense_df["net_amount"].abs().sum()
-total_income = income_df["net_amount"].sum()
-net_savings = total_income - total_spend
-
-living_cats = ["Food & Dining", "Utilities", "HouseHold", "Accomodation"]
-living_spend = sum(get_cat_spend(expense_df, c) for c in living_cats)
-food_spend = get_cat_spend(expense_df, "Food & Dining")
-shopping_spend = get_cat_spend(expense_df, "Shopping")
-travel_spend = get_cat_spend(expense_df, "Travel")
-entertainment_spend = get_cat_spend(expense_df, "Entertainment")
-investment_spend = get_cat_spend(expense_df, "Investment")
-
-prior_living = sum(get_prior_cat_spend(c) for c in living_cats)
-prior_food = get_prior_cat_spend("Food & Dining")
-prior_shopping = get_prior_cat_spend("Shopping")
-prior_travel = get_prior_cat_spend("Travel")
-prior_entertainment = get_prior_cat_spend("Entertainment")
-prior_investment = get_prior_cat_spend("Investment")
-
-# ── TOP KPI BAR ───────────────────────────────────────────────────────────────
-# Maps KPI label → category name (for drill-through on click)
-kpi_label_to_cat = {
-    "Food & Dining": "Food & Dining",
-    "Shopping": "Shopping",
-    "Travel": "Travel",
-    "Entertainment": "Entertainment",
-    "Investment": "Investment",
-}
-
-kpi_cols = st.columns(8)
-kpi_data = [
-    ("Total Spend",     total_spend,        delta_pct(total_spend, prior_expense),       "normal"),
-    ("Living Expenses", living_spend,        delta_pct(living_spend, prior_living),        "normal"),
-    ("Food & Dining",   food_spend,          delta_pct(food_spend, prior_food),            "normal"),
-    ("Shopping",        shopping_spend,      delta_pct(shopping_spend, prior_shopping),    "normal"),
-    ("Travel",          travel_spend,        delta_pct(travel_spend, prior_travel),         "normal"),
-    ("Entertainment",   entertainment_spend, delta_pct(entertainment_spend, prior_entertainment), "normal"),
-    ("Investment",      investment_spend,    delta_pct(investment_spend, prior_investment), "normal"),
-    ("Net Savings",     net_savings,         None,                                          "normal"),
-]
-
-active_drill = st.session_state.get("drill", {})
-
-for col, (label, value, delta, _) in zip(kpi_cols, kpi_data):
-    delta_str = f"{delta:+.1f}%" if delta is not None else None
-    is_active = (
-        active_drill.get("type") == "category" and
-        active_drill.get("value") == kpi_label_to_cat.get(label)
-    )
-    border = "2px solid #7cb47c" if is_active else "none"
-    col.markdown(
-        f'<div style="border:{border}; border-radius:6px; padding:4px;">',
+# ══════════════════════════════════════════════════════════════════════════════
+# HEADER
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("## 📊 Personal Finance Dashboard")
+col_head, col_tag = st.columns([5, 1])
+col_head.markdown(
+    f"**{start_date.strftime('%d %b %Y')}** → **{end_date.strftime('%d %b %Y')}**"
+)
+if excl_invest:
+    col_tag.markdown(
+        '<span style="background:#8B5CF6;color:white;padding:3px 10px;'
+        'border-radius:12px;font-size:12px;">Invest excluded</span>',
         unsafe_allow_html=True,
     )
-    col.metric(
-        label,
-        f"₹{value:,.0f}",
-        delta=delta_str,
-        delta_color="inverse" if label != "Net Savings" else "normal",
-    )
-    cat_name = kpi_label_to_cat.get(label)
-    if cat_name:
-        if col.button("🔍", key=f"kpi_drill_{label}", help=f"Drill into {label} transactions"):
-            _set_drill(type="category", value=cat_name)
-            st.rerun()
-    col.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ROW 1: Monthly stacked bar | Monthly net income bar | Account donut
+# KPI ROW
 # ══════════════════════════════════════════════════════════════════════════════
-row1_cols = st.columns([1, 1, 1])
+k1, k2, k3, k4, k5 = st.columns(5)
 
-# ── Col 1: Stacked bar — monthly expenses by top-6 category ──────────────────
-with row1_cols[0]:
-    st.markdown("#### Monthly Expenses by Category")
-    if not expense_df.empty:
-        top6_cats = (
-            expense_df.groupby("eff_category")["abs_amount"]
-            .sum()
-            .nlargest(6)
-            .index.tolist()
-        )
-        monthly_cat = (
-            expense_df[expense_df["eff_category"].isin(top6_cats)]
-            .groupby(["month", "eff_category"])["abs_amount"]
-            .sum()
-            .reset_index()
-        )
-        fig_bar = go.Figure()
-        for i, cat in enumerate(top6_cats):
-            cat_data = monthly_cat[monthly_cat["eff_category"] == cat]
-            fig_bar.add_trace(go.Bar(
-                x=cat_data["month"],
-                y=cat_data["abs_amount"],
-                name=cat,
-                marker_color=PALETTE[i % len(PALETTE)],
-            ))
-        fig_bar.update_layout(
-            barmode="stack",
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", y=-0.25, font_size=10),
-            margin=dict(l=0, r=0, t=20, b=60),
-            xaxis_title="Month",
-            yaxis_title="Amount (₹)",
-            height=320,
-        )
-        ev_bar = st.plotly_chart(
-            fig_bar, use_container_width=True,
-            key="stacked_bar", on_select="rerun",
-        )
-        if ev_bar and ev_bar.selection and ev_bar.selection.points:
-            pt = ev_bar.selection.points[0]
-            curve_idx = pt.get("curveNumber", 0)
-            clicked_cat = top6_cats[curve_idx] if curve_idx < len(top6_cats) else None
-            clicked_month = pt.get("x")
-            if clicked_cat:
-                _set_drill(type="category", value=clicked_cat, month=clicked_month)
-                st.rerun()
-    else:
-        st.caption("No expense data.")
-
-# ── Col 2: Monthly net income bar ─────────────────────────────────────────────
-with row1_cols[1]:
-    st.markdown("#### Monthly Net Income")
-    monthly_net = (
-        df.groupby("month")["net_amount"]
-        .sum()
-        .reset_index()
-        .rename(columns={"net_amount": "net"})
+k1.metric(
+    "💰 Total Income",
+    f"₹{total_income:,.0f}",
+    delta=f"{delta_label(total_income, prior_income):+.1f}%" if delta_label(total_income, prior_income) else None,
+)
+k2.metric(
+    "💸 Expenses" + (" (ex-Invest)" if excl_invest else ""),
+    f"₹{total_expense:,.0f}",
+    delta=f"{delta_label(total_expense, prior_exp_val):+.1f}%" if delta_label(total_expense, prior_exp_val) else None,
+    delta_color="inverse",
+)
+if excl_invest:
+    k3.metric(
+        "📈 Invested",
+        f"₹{invest_total:,.0f}",
+        delta=f"{delta_label(invest_total, prior_invest):+.1f}%" if delta_label(invest_total, prior_invest) else None,
+        delta_color="normal",
     )
-    monthly_net = monthly_net.sort_values("month")
-    fig_net = go.Figure(go.Bar(
-        x=monthly_net["month"],
-        y=monthly_net["net"],
-        marker_color=[
-            "#7cb47c" if v >= 0 else "#d4889a"
-            for v in monthly_net["net"]
-        ],
+else:
+    k3.metric("📈 Invested", f"₹{invest_total:,.0f}")
+
+k4.metric(
+    "🏦 Net Savings",
+    f"₹{net_savings:,.0f}",
+    delta=f"{delta_label(net_savings, prior_savings):+.1f}%" if delta_label(net_savings, prior_savings) else None,
+    delta_color="normal",
+)
+
+sr_delta = round(savings_rate - prior_srate, 1) if prior_srate != 0 else None
+k5.metric(
+    "📉 Savings Rate",
+    f"{savings_rate:.1f}%",
+    delta=f"{sr_delta:+.1f}pp" if sr_delta is not None else None,
+    delta_color="normal" if (sr_delta or 0) >= 0 else "inverse",
+)
+
+st.markdown("---")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ROW 1 — Monthly Cash Flow (wide) | Expense Breakdown (donut)
+# ══════════════════════════════════════════════════════════════════════════════
+r1a, r1b = st.columns([3, 2])
+
+with r1a:
+    st.markdown("#### 📅 Monthly Cash Flow")
+    all_months = sorted(df["month"].unique())
+
+    m_inc  = income_df.groupby("month")["net_amount"].sum().reindex(all_months, fill_value=0)
+    m_exp  = expense_view.groupby("month")["net_amount"].apply(
+        lambda x: x.abs().sum()
+    ).reindex(all_months, fill_value=0)
+    m_inv  = invest_df.groupby("month")["abs_amount"].sum().reindex(all_months, fill_value=0)
+    m_net  = m_inc - expense_df.groupby("month")["net_amount"].apply(
+        lambda x: x.abs().sum()
+    ).reindex(all_months, fill_value=0)
+
+    fig_cf = go.Figure()
+    fig_cf.add_trace(go.Bar(
+        x=all_months, y=m_inc.values,
+        name="Income", marker_color=C_INCOME, opacity=0.85,
+        hovertemplate="Income: ₹%{y:,.0f}<extra></extra>",
     ))
-    fig_net.update_layout(
+    fig_cf.add_trace(go.Bar(
+        x=all_months, y=m_exp.values,
+        name="Expenses" + (" (ex-Invest)" if excl_invest else ""),
+        marker_color=C_EXPENSE, opacity=0.85,
+        hovertemplate="Expenses: ₹%{y:,.0f}<extra></extra>",
+    ))
+    if excl_invest and m_inv.sum() > 0:
+        fig_cf.add_trace(go.Bar(
+            x=all_months, y=m_inv.values,
+            name="Investment", marker_color=C_INVEST, opacity=0.85,
+            hovertemplate="Investment: ₹%{y:,.0f}<extra></extra>",
+        ))
+    fig_cf.add_trace(go.Scatter(
+        x=all_months, y=m_net.values,
+        name="Net Savings",
+        mode="lines+markers",
+        line=dict(color=C_SAVINGS, width=2.5, dash="dot"),
+        marker=dict(size=7, color=C_SAVINGS),
+        hovertemplate="Net: ₹%{y:,.0f}<extra></extra>",
+    ))
+    fig_cf.update_layout(
+        barmode="group",
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=0, r=0, t=20, b=40),
-        xaxis_title="Month",
-        yaxis_title="Net (₹)",
-        height=320,
+        legend=dict(orientation="h", y=-0.25, font_size=11, bgcolor="rgba(0,0,0,0)"),
+        margin=dict(l=0, r=0, t=10, b=60),
+        height=330,
+        xaxis=dict(showgrid=False, title=None),
+        yaxis=dict(gridcolor="#F3F4F6", tickprefix="₹", title=None),
+        hovermode="x unified",
     )
-    ev_net = st.plotly_chart(
-        fig_net, use_container_width=True,
-        key="net_bar", on_select="rerun",
-    )
-    if ev_net and ev_net.selection and ev_net.selection.points:
-        pt = ev_net.selection.points[0]
+    ev_cf = st.plotly_chart(fig_cf, use_container_width=True, key="cf_chart", on_select="rerun")
+    if ev_cf and ev_cf.selection and ev_cf.selection.points:
+        pt = ev_cf.selection.points[0]
         clicked_month = pt.get("x")
         if clicked_month:
             _set_drill(type="month", value=clicked_month)
             st.rerun()
 
-# ── Col 3: Donut — spend by account ──────────────────────────────────────────
-with row1_cols[2]:
-    st.markdown("#### Spend by Account")
-    acc_spend = (
-        expense_df.groupby("account_name")["abs_amount"]
-        .sum()
-        .reset_index()
-    )
-    if not acc_spend.empty:
+with r1b:
+    st.markdown("#### 🧩 Expense Breakdown")
+    if not expense_view.empty:
+        cat_totals = (
+            expense_view.groupby("eff_category")["abs_amount"]
+            .sum()
+            .sort_values(ascending=False)
+        )
+        # Group beyond top 8 as "Other"
+        if len(cat_totals) > 8:
+            top8  = cat_totals.iloc[:8]
+            other = cat_totals.iloc[8:].sum()
+            cat_totals = pd.concat([top8, pd.Series({"Other": other})])
+
         fig_donut = go.Figure(go.Pie(
-            labels=acc_spend["account_name"],
-            values=acc_spend["abs_amount"],
-            hole=0.55,
-            marker=dict(colors=PALETTE),
+            labels=cat_totals.index,
+            values=cat_totals.values,
+            hole=0.62,
+            marker=dict(colors=CAT_COLORS[:len(cat_totals)], line=dict(width=1.5, color="white")),
             textinfo="label+percent",
+            textfont_size=10,
+            hovertemplate="<b>%{label}</b><br>₹%{value:,.0f} (%{percent})<extra></extra>",
         ))
         fig_donut.update_layout(
             annotations=[{
-                "text": f"₹{total_spend:,.0f}",
+                "text": f"<b>₹{total_expense:,.0f}</b>",
                 "x": 0.5, "y": 0.5,
-                "font_size": 13,
+                "font": dict(size=13, color="#1F2937"),
                 "showarrow": False,
             }],
             showlegend=False,
-            margin=dict(l=0, r=0, t=20, b=0),
+            margin=dict(l=0, r=0, t=10, b=0),
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            height=320,
+            height=330,
         )
         ev_donut = st.plotly_chart(
-            fig_donut, use_container_width=True,
-            key="donut_chart", on_select="rerun",
+            fig_donut, use_container_width=True, key="donut_chart", on_select="rerun"
         )
         if ev_donut and ev_donut.selection and ev_donut.selection.points:
             pt = ev_donut.selection.points[0]
-            clicked_account = pt.get("label")
-            if clicked_account:
-                _set_drill(type="account", value=clicked_account)
+            label = pt.get("label")
+            if label and label != "Other":
+                _set_drill(type="category", value=label)
                 st.rerun()
     else:
         st.caption("No expense data.")
@@ -453,29 +371,77 @@ with row1_cols[2]:
 st.markdown("---")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ROW 2: Treemap (60%) | Multi-line trend (40%)
+# ROW 2 — Top Categories (bar) | Treemap
 # ══════════════════════════════════════════════════════════════════════════════
-row2_cols = st.columns([3, 2])
+r2a, r2b = st.columns([2, 3])
 
-with row2_cols[0]:
-    st.markdown("#### Expense Treemap — YTD")
-    if not expense_df.empty:
-        treemap_df = (
-            expense_df.groupby(["eff_category", "eff_subcategory"])["abs_amount"]
+with r2a:
+    st.markdown("#### 🏷️ Top Spending Categories")
+    if not expense_view.empty:
+        top_cats = (
+            expense_view.groupby("eff_category")["abs_amount"]
+            .sum()
+            .sort_values(ascending=True)
+            .tail(10)
+        )
+        total_for_pct = top_cats.sum()
+        pct = (top_cats / total_for_pct * 100).round(1) if total_for_pct > 0 else top_cats * 0
+
+        colors = [CAT_COLORS[i % len(CAT_COLORS)] for i in range(len(top_cats))]
+
+        fig_cats = go.Figure(go.Bar(
+            x=top_cats.values,
+            y=top_cats.index,
+            orientation="h",
+            marker=dict(color=colors, line=dict(width=0)),
+            text=[f"₹{v:,.0f}  {p:.1f}%" for v, p in zip(top_cats.values, pct.values)],
+            textposition="outside",
+            textfont=dict(size=10),
+            hovertemplate="<b>%{y}</b><br>₹%{x:,.0f}<extra></extra>",
+        ))
+        fig_cats.update_layout(
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=90, t=10, b=0),
+            xaxis=dict(visible=False),
+            yaxis=dict(showgrid=False, tickfont=dict(size=11)),
+            height=380,
+        )
+        ev_cats = st.plotly_chart(
+            fig_cats, use_container_width=True, key="cats_bar", on_select="rerun"
+        )
+        if ev_cats and ev_cats.selection and ev_cats.selection.points:
+            pt = ev_cats.selection.points[0]
+            cat = pt.get("y")
+            if cat:
+                _set_drill(type="category", value=cat)
+                st.rerun()
+    else:
+        st.caption("No data.")
+
+with r2b:
+    st.markdown("#### 🗺️ Expense Treemap")
+    if not expense_view.empty:
+        tm_df = (
+            expense_view.groupby(["eff_category", "eff_subcategory"])["abs_amount"]
             .sum()
             .reset_index()
         )
-        treemap_df = treemap_df[treemap_df["abs_amount"] > 0]
-        treemap_df["root"] = "Total"
+        tm_df = tm_df[tm_df["abs_amount"] > 0]
+        tm_df["root"] = "All Expenses"
+
+        unique_cats = tm_df["eff_category"].unique().tolist()
+        cat_cmap = {c: CAT_COLORS[i % len(CAT_COLORS)] for i, c in enumerate(unique_cats)}
+
         fig_tree = px.treemap(
-            treemap_df,
+            tm_df,
             path=["root", "eff_category", "eff_subcategory"],
             values="abs_amount",
             color="eff_category",
-            color_discrete_sequence=PALETTE,
+            color_discrete_map={"(?)": "#9CA3AF", **cat_cmap},
         )
         fig_tree.update_layout(
-            margin=dict(l=0, r=0, t=20, b=0),
+            margin=dict(l=0, r=0, t=10, b=0),
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             height=380,
@@ -485,233 +451,247 @@ with row2_cols[0]:
             hovertemplate="<b>%{label}</b><br>₹%{value:,.0f}<extra></extra>",
         )
         ev_tree = st.plotly_chart(
-            fig_tree, use_container_width=True,
-            key="treemap_chart", on_select="rerun",
+            fig_tree, use_container_width=True, key="treemap_chart", on_select="rerun"
         )
         if ev_tree and ev_tree.selection and ev_tree.selection.points:
             pt = ev_tree.selection.points[0]
             label = str(pt.get("label", ""))
-            if label and label not in ("Total", ""):
-                # Determine if label is a category or subcategory
-                if label in expense_df["eff_category"].values:
+            if label and label not in ("All Expenses", ""):
+                if label in expense_view["eff_category"].values:
                     _set_drill(type="category", value=label)
                     st.rerun()
-                elif label in expense_df["eff_subcategory"].values:
-                    parent_cat = expense_df[
-                        expense_df["eff_subcategory"] == label
+                elif label in expense_view["eff_subcategory"].values:
+                    parent = expense_view[
+                        expense_view["eff_subcategory"] == label
                     ]["eff_category"].iloc[0]
-                    _set_drill(type="subcategory", category=parent_cat, value=label)
+                    _set_drill(type="subcategory", category=parent, value=label)
                     st.rerun()
     else:
-        st.caption("No expense data for treemap.")
-
-with row2_cols[1]:
-    st.markdown("#### Monthly Trend — Top 6 Categories")
-    if not expense_df.empty:
-        top6 = (
-            expense_df.groupby("eff_category")["abs_amount"]
-            .sum()
-            .nlargest(6)
-            .index.tolist()
-        )
-        trend_df = (
-            expense_df[expense_df["eff_category"].isin(top6)]
-            .groupby(["month", "eff_category"])["abs_amount"]
-            .sum()
-            .reset_index()
-        )
-        fig_trend = go.Figure()
-        for i, cat in enumerate(top6):
-            cat_data = trend_df[trend_df["eff_category"] == cat]
-            fig_trend.add_trace(go.Scatter(
-                x=cat_data["month"],
-                y=cat_data["abs_amount"],
-                name=cat,
-                mode="lines+markers",
-                line=dict(color=PALETTE[i % len(PALETTE)], width=2),
-                marker=dict(size=6),
-            ))
-        fig_trend.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", y=-0.35, font_size=9),
-            margin=dict(l=0, r=0, t=20, b=80),
-            xaxis_title="Month",
-            yaxis_title="₹",
-            height=380,
-        )
-        ev_trend = st.plotly_chart(
-            fig_trend, use_container_width=True,
-            key="trend_chart", on_select="rerun",
-        )
-        if ev_trend and ev_trend.selection and ev_trend.selection.points:
-            pt = ev_trend.selection.points[0]
-            curve_idx = pt.get("curveNumber", 0)
-            clicked_cat = top6[curve_idx] if curve_idx < len(top6) else None
-            clicked_month = pt.get("x")
-            if clicked_cat:
-                _set_drill(type="category", value=clicked_cat, month=clicked_month)
-                st.rerun()
-    else:
-        st.caption("No trend data.")
+        st.caption("No data.")
 
 st.markdown("---")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ROW 3: Top 10 subcategories (horiz bar) | Waterfall chart
+# ROW 3 — Monthly Savings Rate | Budget vs Actual
 # ══════════════════════════════════════════════════════════════════════════════
-row3_cols = st.columns(2)
+r3a, r3b = st.columns([2, 3])
 
-with row3_cols[0]:
-    st.markdown("#### Top 10 Subcategories by Spend YTD")
-    if not expense_df.empty:
-        top10_sub = (
-            expense_df.groupby(["eff_category", "eff_subcategory"])["abs_amount"]
-            .sum()
-            .reset_index()
-            .nlargest(10, "abs_amount")
-        )
-        cat_colors = {
-            cat: PALETTE[i % len(PALETTE)]
-            for i, cat in enumerate(top10_sub["eff_category"].unique())
-        }
-        top10_sub["color"] = top10_sub["eff_category"].map(cat_colors)
-        top10_sub["y_label"] = (
-            top10_sub["eff_subcategory"] + " (" + top10_sub["eff_category"] + ")"
-        )
-        fig_horiz = go.Figure(go.Bar(
-            x=top10_sub["abs_amount"],
-            y=top10_sub["y_label"],
-            orientation="h",
-            marker_color=top10_sub["color"],
-            text=top10_sub["abs_amount"].apply(lambda v: f"₹{v:,.0f}"),
-            textposition="outside",
-        ))
-        fig_horiz.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=60, t=20, b=0),
-            xaxis_title="Amount (₹)",
-            yaxis=dict(autorange="reversed"),
-            height=380,
-        )
-        ev_horiz = st.plotly_chart(
-            fig_horiz, use_container_width=True,
-            key="horiz_bar", on_select="rerun",
-        )
-        if ev_horiz and ev_horiz.selection and ev_horiz.selection.points:
-            pt = ev_horiz.selection.points[0]
-            y_label = str(pt.get("y", ""))
-            if "(" in y_label and y_label.endswith(")"):
-                sub = y_label[:y_label.rfind("(")].strip()
-                cat = y_label[y_label.rfind("(") + 1: -1]
-                _set_drill(type="subcategory", category=cat, value=sub)
-                st.rerun()
-    else:
-        st.caption("No subcategory data.")
+with r3a:
+    st.markdown("#### 💹 Monthly Savings Rate")
+    m_inc2  = income_df.groupby("month")["net_amount"].sum().reindex(all_months, fill_value=0)
+    m_allexp = expense_df.groupby("month")["net_amount"].apply(
+        lambda x: x.abs().sum()
+    ).reindex(all_months, fill_value=0)
+    m_net2  = m_inc2 - m_allexp
+    safe_inc = m_inc2.replace(0, np.nan)
+    m_srate = (m_net2 / safe_inc * 100).fillna(0)
 
-with row3_cols[1]:
-    st.markdown("#### Income & Expense Waterfall")
-    if not df.empty:
-        salary_total = income_df["net_amount"].sum()
-        cat_totals = (
-            expense_df.groupby("eff_category")["abs_amount"]
-            .sum()
-            .nlargest(8)
-        )
-        labels = ["Income"] + list(cat_totals.index) + ["Net Savings"]
-        values = [salary_total] + [-v for v in cat_totals.values] + [0]
-        net_shown = salary_total - cat_totals.sum()
-        values[-1] = net_shown
-
-        measure = ["absolute"] + ["relative"] * len(cat_totals) + ["total"]
-        colors = [
-            "#7cb47c" if v >= 0 else "#d4889a"
-            for v in [salary_total] + list(-cat_totals.values) + [net_shown]
-        ]
-
-        fig_wf = go.Figure(go.Waterfall(
-            x=labels,
-            y=values,
-            measure=measure,
-            connector=dict(line=dict(color="#888", width=0.5)),
-            increasing=dict(marker_color="#7cb47c"),
-            decreasing=dict(marker_color="#d4889a"),
-            totals=dict(marker_color="#8b6fba"),
-            texttemplate="₹%{y:,.0f}",
-            textposition="outside",
-        ))
-        fig_wf.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=0, t=20, b=60),
-            xaxis_tickangle=-30,
-            yaxis_title="₹",
-            height=380,
-        )
-        ev_wf = st.plotly_chart(
-            fig_wf, use_container_width=True,
-            key="waterfall_chart", on_select="rerun",
-        )
-        if ev_wf and ev_wf.selection and ev_wf.selection.points:
-            pt = ev_wf.selection.points[0]
-            clicked_x = str(pt.get("x", ""))
-            if clicked_x and clicked_x not in ("Income", "Net Savings", ""):
-                _set_drill(type="category", value=clicked_x)
-                st.rerun()
-    else:
-        st.caption("No data for waterfall.")
-
-st.markdown("---")
-
-# ══════════════════════════════════════════════════════════════════════════════
-# ROW 4: Heatmap — Month × Category
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown("#### Month-over-Month Spend Heatmap")
-if not expense_df.empty:
-    heatmap_data = (
-        expense_df.groupby(["month", "eff_category"])["abs_amount"]
-        .sum()
-        .reset_index()
-    )
-    pivot_hm = heatmap_data.pivot_table(
-        index="eff_category", columns="month", values="abs_amount", fill_value=0
-    )
-    pivot_hm = pivot_hm[sorted(pivot_hm.columns)]
-
-    # Limit to top 15 categories by total
-    top_cats_hm = pivot_hm.sum(axis=1).nlargest(15).index
-    pivot_hm = pivot_hm.loc[top_cats_hm]
-
-    fig_hm = go.Figure(go.Heatmap(
-        z=pivot_hm.values,
-        x=pivot_hm.columns.tolist(),
-        y=pivot_hm.index.tolist(),
-        colorscale=[[0, "#1e1e2e"], [0.01, "#ffffff"], [1, "#d4889a"]],
-        text=[[f"₹{v:,.0f}" if v > 0 else "" for v in row] for row in pivot_hm.values],
-        texttemplate="%{text}",
-        textfont=dict(size=9),
-        hovertemplate="<b>%{y}</b> | %{x}<br>₹%{z:,.0f}<extra></extra>",
+    fig_sr = go.Figure()
+    fig_sr.add_trace(go.Bar(
+        x=all_months, y=m_srate.values,
+        marker_color=[C_SAVINGS if v >= 0 else C_EXPENSE for v in m_srate.values],
+        text=[f"{v:.1f}%" for v in m_srate.values],
+        textposition="outside",
+        textfont=dict(size=10),
+        hovertemplate="Savings Rate: %{y:.1f}%<extra></extra>",
     ))
-    fig_hm.update_layout(
+    fig_sr.add_hline(
+        y=0, line_color="#9CA3AF", line_width=1,
+    )
+    fig_sr.add_hline(
+        y=20, line_dash="dash", line_color=C_SAVINGS, line_width=1.2,
+        annotation_text="20% target",
+        annotation_position="top right",
+        annotation_font=dict(size=9, color=C_SAVINGS),
+    )
+    fig_sr.update_layout(
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=140, r=0, t=20, b=60),
-        xaxis_title="Month",
-        xaxis_tickangle=-30,
-        height=max(300, len(top_cats_hm) * 28 + 80),
+        margin=dict(l=0, r=0, t=30, b=40),
+        yaxis=dict(title="Savings Rate %", gridcolor="#F3F4F6"),
+        xaxis=dict(showgrid=False, title=None),
+        showlegend=False,
+        height=350,
     )
-    ev_hm = st.plotly_chart(
-        fig_hm, use_container_width=True,
-        key="heatmap_chart", on_select="rerun",
+    st.plotly_chart(fig_sr, use_container_width=True, key="srate_chart")
+
+with r3b:
+    st.markdown("#### 📊 Budget vs Actual (Current Month)")
+    budgets = get_budgets()
+    curr_month_str = datetime.now().strftime("%Y-%m")
+    curr_month_exp = (
+        expense_view[expense_view["month"] == curr_month_str]
+        if not expense_view.empty
+        else pd.DataFrame()
     )
-    if ev_hm and ev_hm.selection and ev_hm.selection.points:
-        pt = ev_hm.selection.points[0]
-        clicked_cat = pt.get("y")
-        clicked_month = pt.get("x")
-        if clicked_cat:
-            _set_drill(type="category", value=clicked_cat, month=clicked_month)
-            st.rerun()
+
+    if budgets:
+        rows = []
+        for cat, budget in budgets.items():
+            actual = (
+                curr_month_exp[curr_month_exp["eff_category"] == cat]["abs_amount"].sum()
+                if not curr_month_exp.empty
+                else 0.0
+            )
+            rows.append({
+                "cat": cat,
+                "budget": budget,
+                "actual": actual,
+                "used": min(actual, budget),
+                "remaining": max(budget - actual, 0),
+                "over": max(actual - budget, 0),
+            })
+
+        bdf = pd.DataFrame(rows).sort_values("actual", ascending=True)
+        bar_colors = [C_EXPENSE if r > 0 else C_SAVINGS for r in bdf["over"]]
+
+        fig_bud = go.Figure()
+        fig_bud.add_trace(go.Bar(
+            y=bdf["cat"],
+            x=bdf["used"],
+            orientation="h",
+            name="Spent",
+            marker=dict(color=bar_colors),
+            text=[f"₹{v:,.0f}" for v in bdf["actual"]],
+            textposition="inside",
+            textfont=dict(size=10, color="white"),
+            hovertemplate="<b>%{y}</b><br>Spent: ₹%{x:,.0f}<extra></extra>",
+        ))
+        fig_bud.add_trace(go.Bar(
+            y=bdf["cat"],
+            x=bdf["remaining"],
+            orientation="h",
+            name="Remaining",
+            marker_color="#E5E7EB",
+            hovertemplate="<b>%{y}</b><br>Remaining: ₹%{x:,.0f}<extra></extra>",
+        ))
+        # Add budget line markers
+        for _, row in bdf.iterrows():
+            fig_bud.add_shape(
+                type="line",
+                x0=row["budget"], x1=row["budget"],
+                y0=str(row["cat"]),
+                y1=str(row["cat"]),
+                yref="y",
+                line=dict(color="#6B7280", width=2, dash="dot"),
+            )
+        fig_bud.update_layout(
+            barmode="stack",
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=10, b=40),
+            xaxis=dict(title="₹", gridcolor="#F3F4F6"),
+            yaxis=dict(showgrid=False, tickfont=dict(size=11)),
+            legend=dict(orientation="h", y=-0.2, bgcolor="rgba(0,0,0,0)"),
+            height=350,
+        )
+        st.plotly_chart(fig_bud, use_container_width=True, key="budget_chart")
+
+        over = bdf[bdf["over"] > 0]
+        for _, r in over.iterrows():
+            st.warning(f"⚠️ **{r['cat']}** over budget by ₹{r['over']:,.0f}")
+    else:
+        st.info("No budgets set. Go to **Settings → Budget** to add monthly limits.")
+
+st.markdown("---")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INSIGHTS ROW
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("#### 💡 Key Insights")
+ins1, ins2, ins3, ins4 = st.columns(4)
+
+with ins1:
+    with st.container(border=True):
+        st.markdown("**🔝 Top Category**")
+        if not expense_view.empty:
+            by_cat = expense_view.groupby("eff_category")["abs_amount"].sum()
+            top_cat = by_cat.idxmax()
+            top_val = by_cat.max()
+            pct = top_val / total_expense * 100 if total_expense > 0 else 0
+            st.metric(top_cat, f"₹{top_val:,.0f}", delta=f"{pct:.1f}% of expenses", delta_color="off")
+        else:
+            st.caption("No data")
+
+with ins2:
+    with st.container(border=True):
+        st.markdown("**📅 Avg Daily Spend**")
+        if not expense_view.empty:
+            n_days = max((end_date - start_date).days, 1)
+            avg_period = total_expense / n_days
+            cm_df = expense_view[expense_view["month"] == curr_month_str]
+            cm_daily = cm_df["abs_amount"].sum() / max(datetime.now().day, 1)
+            st.metric(
+                "This month",
+                f"₹{cm_daily:,.0f} /day",
+                delta=f"Period avg ₹{avg_period:,.0f}",
+                delta_color="off",
+            )
+        else:
+            st.caption("No data")
+
+with ins3:
+    with st.container(border=True):
+        st.markdown("**💸 Biggest Transaction**")
+        if not expense_view.empty:
+            big = expense_view.nlargest(1, "abs_amount").iloc[0]
+            st.metric(
+                str(big.get("date", ""))[:10],
+                f"₹{big['abs_amount']:,.0f}",
+                delta=str(big.get("description", ""))[:35],
+                delta_color="off",
+            )
+        else:
+            st.caption("No data")
+
+with ins4:
+    with st.container(border=True):
+        st.markdown("**📈 vs Prior Period**")
+        if not expense_view.empty and not prior_expense_df.empty:
+            curr_by = expense_view.groupby("eff_category")["abs_amount"].sum()
+            prev_by = prior_expense_df.groupby("eff_category")["abs_amount"].sum()
+            changes = [
+                (cat, curr_by[cat], (curr_by[cat] - prev_by.get(cat, 0)) / prev_by[cat] * 100)
+                for cat in curr_by.index
+                if prev_by.get(cat, 0) > 0
+            ]
+            if changes:
+                changes.sort(key=lambda x: -x[2])
+                cat, val, pct = changes[0]
+                icon = "🔴" if pct > 20 else "🟡"
+                st.metric(
+                    f"{icon} {cat}",
+                    f"₹{val:,.0f}",
+                    delta=f"{pct:+.1f}% vs prior",
+                    delta_color="inverse",
+                )
+            else:
+                st.caption("No prior period data.")
+        else:
+            st.caption("Need prior period data.")
+
+# Months where spending exceeded income
+if not df.empty:
+    monthly_net = df.groupby("month")["net_amount"].sum()
+    neg_months = monthly_net[monthly_net < 0]
+    if not neg_months.empty:
+        st.markdown("")
+        for m, v in neg_months.items():
+            st.error(
+                f"🚨 **{m}**: Spending exceeded income by ₹{abs(v):,.0f}"
+            )
+
+# Outstanding loans
+loans = get_loan_tags(status="outstanding")
+if loans:
+    st.markdown("")
+    with st.container(border=True):
+        st.markdown("**🤝 Outstanding Loans**")
+        loan_data = [
+            {"Contact": lt["contact_name"], "Status": lt["status"]}
+            for lt in loans
+        ]
+        st.dataframe(pd.DataFrame(loan_data), use_container_width=True, hide_index=True)
 
 st.markdown("---")
 
@@ -720,12 +700,11 @@ st.markdown("---")
 # ══════════════════════════════════════════════════════════════════════════════
 drill = st.session_state.get("drill", {})
 if drill:
-    drill_type = drill.get("type")
+    drill_type  = drill.get("type")
     drill_value = drill.get("value")
     drill_month = drill.get("month")
-    drill_cat = drill.get("category")  # for subcategory drills
+    drill_cat   = drill.get("category")
 
-    # Build the filtered DataFrame
     drill_df = df.copy()
     if drill_type == "account":
         drill_df = drill_df[drill_df["account_name"] == drill_value]
@@ -744,158 +723,49 @@ if drill:
             ]
         else:
             drill_df = drill_df[drill_df["eff_subcategory"] == drill_value]
-        header = f"Category: **{drill_cat}** / Subcategory: **{drill_value}**"
+        header = f"**{drill_cat}** / **{drill_value}**"
     elif drill_type == "month":
         drill_df = drill_df[drill_df["month"] == drill_value]
         header = f"Month: **{drill_value}**"
     else:
-        header = "Filtered Transactions"
+        header = "Transactions"
 
-    hdr_col, btn_col = st.columns([6, 1])
-    hdr_col.markdown(f"#### 📋 Drill-through — {header}")
-    if btn_col.button("✕ Clear", key="clear_drill_main", use_container_width=True):
+    hc, bc = st.columns([6, 1])
+    hc.markdown(f"#### 📋 Transactions — {header}")
+    if bc.button("✕ Clear", key="clear_drill", use_container_width=True):
         _clear_drill()
         st.rerun()
 
     if not drill_df.empty:
-        d_expense = drill_df[drill_df["net_amount"] < 0]
-        d_income  = drill_df[drill_df["net_amount"] > 0]
+        d_exp = drill_df[drill_df["net_amount"] < 0]
+        d_inc = drill_df[drill_df["net_amount"] > 0]
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Transactions", len(drill_df))
-        m2.metric("Total Debit",  f"₹{d_expense['abs_amount'].sum():,.2f}")
-        m3.metric("Total Credit", f"₹{d_income['net_amount'].sum():,.2f}")
+        m2.metric("Total Debit",  f"₹{d_exp['abs_amount'].sum():,.2f}")
+        m3.metric("Total Credit", f"₹{d_inc['net_amount'].sum():,.2f}")
         m4.metric("Net",          f"₹{drill_df['net_amount'].sum():,.2f}")
 
-        show_df = drill_df[["date", "description", "debit", "credit", "net_amount",
-                             "account_name", "eff_category", "eff_subcategory"]].copy()
-        show_df["date"] = show_df["date"].dt.date
-        show_df = show_df.sort_values("date", ascending=False).head(200)
+        show = drill_df[[
+            "date", "description", "debit", "credit", "net_amount",
+            "account_name", "eff_category", "eff_subcategory",
+        ]].copy()
+        show["date"] = show["date"].dt.date
+        show = show.sort_values("date", ascending=False).head(200)
 
         st.dataframe(
-            show_df,
+            show,
             column_config={
-                "date":           st.column_config.DateColumn("Date"),
-                "debit":          st.column_config.NumberColumn("Debit",  format="₹%.2f"),
-                "credit":         st.column_config.NumberColumn("Credit", format="₹%.2f"),
-                "net_amount":     st.column_config.NumberColumn("Net",    format="₹%.2f"),
-                "eff_category":   st.column_config.TextColumn("Category"),
-                "eff_subcategory":st.column_config.TextColumn("Subcategory"),
+                "date":            st.column_config.DateColumn("Date"),
+                "debit":           st.column_config.NumberColumn("Debit",        format="₹%.2f"),
+                "credit":          st.column_config.NumberColumn("Credit",       format="₹%.2f"),
+                "net_amount":      st.column_config.NumberColumn("Net",          format="₹%.2f"),
+                "eff_category":    st.column_config.TextColumn("Category"),
+                "eff_subcategory": st.column_config.TextColumn("Subcategory"),
             },
             use_container_width=True,
             hide_index=True,
         )
         if len(drill_df) > 200:
-            st.caption(f"Showing first 200 of {len(drill_df)} matching transactions.")
+            st.caption(f"Showing first 200 of {len(drill_df)} transactions.")
     else:
         st.info("No transactions found for this filter.")
-
-    st.markdown("---")
-
-# ══════════════════════════════════════════════════════════════════════════════
-# INSIGHTS PANEL
-# ══════════════════════════════════════════════════════════════════════════════
-with st.expander("💡 Smart Insights", expanded=True):
-    ins_cols = st.columns(2)
-
-    with ins_cols[0]:
-        # Top 3 overspent vs last month
-        st.markdown("##### 📈 Top Overspent vs Prior Period")
-        if not expense_df.empty and not prior_df.empty:
-            curr_cat = expense_df.groupby("eff_category")["abs_amount"].sum()
-            prior_cat = prior_df[prior_df["net_amount"] < 0].groupby("eff_category")["abs_amount"].sum() \
-                if not prior_df.empty else pd.Series(dtype=float)
-
-            overspend = []
-            for cat in curr_cat.index:
-                curr_val = curr_cat.get(cat, 0)
-                prior_val = prior_cat.get(cat, 0)
-                if prior_val > 0:
-                    pct = (curr_val - prior_val) / prior_val * 100
-                    overspend.append((cat, curr_val, pct))
-
-            overspend.sort(key=lambda x: -x[2])
-            for cat, val, pct in overspend[:3]:
-                color = "🔴" if pct > 20 else "🟡"
-                st.markdown(f"{color} **{cat}**: ₹{val:,.0f} `+{pct:.1f}%` vs prior period")
-        else:
-            st.caption("Not enough data for comparison.")
-
-        st.markdown("---")
-
-        # Months where spending exceeded income
-        st.markdown("##### ⚠️ Months Over Budget")
-        monthly_totals = df.groupby("month")["net_amount"].sum()
-        negative_months = monthly_totals[monthly_totals < 0]
-        if not negative_months.empty:
-            for m, v in negative_months.items():
-                st.error(f"🚨 **{m}**: Net ₹{v:,.0f} (spending exceeded income)")
-        else:
-            st.success("✅ No months where spending exceeded income.")
-
-    with ins_cols[1]:
-        # Biggest single transaction
-        st.markdown("##### 💸 Biggest Single Transaction")
-        if not expense_df.empty:
-            biggest = expense_df.nlargest(1, "abs_amount").iloc[0]
-            st.metric(
-                biggest.get("description", "?")[:50],
-                f"₹{biggest['abs_amount']:,.2f}",
-                delta=str(biggest.get("date", "?")),
-                delta_color="off",
-            )
-
-        # Average daily spend
-        st.markdown("---")
-        st.markdown("##### 📅 Average Daily Spend")
-        if not expense_df.empty:
-            this_month = datetime.now().strftime("%Y-%m")
-            this_month_df = expense_df[expense_df["month"] == this_month]
-            curr_day = datetime.now().day
-            avg_today = this_month_df["abs_amount"].sum() / max(curr_day, 1)
-
-            all_months = expense_df.groupby("month")["abs_amount"].sum()
-            monthly_avg = all_months.mean()
-            days_in_month = 30
-            avg_daily_all = monthly_avg / days_in_month
-
-            st.metric(
-                "This Month (daily avg)",
-                f"₹{avg_today:,.0f}",
-                delta=f"vs ₹{avg_daily_all:,.0f} historical avg",
-                delta_color="off",
-            )
-
-        # Outstanding loans
-        st.markdown("---")
-        st.markdown("##### 🤝 Outstanding Loans")
-        loans = get_loan_tags(status="outstanding")
-        if loans:
-            loan_data = [{
-                "Contact": lt["contact_name"],
-                "Status": lt["status"],
-                "Since": lt.get("created_ts", "?"),
-            } for lt in loans]
-            st.dataframe(pd.DataFrame(loan_data), use_container_width=True, hide_index=True)
-        else:
-            st.caption("No outstanding loans.")
-
-    # Budget vs Actual
-    st.markdown("---")
-    st.markdown("##### 📊 Budget vs Actual")
-    budgets = get_budgets()
-    if budgets:
-        curr_month_str = datetime.now().strftime("%Y-%m")
-        curr_month_df = expense_df[expense_df["month"] == curr_month_str] if not expense_df.empty else pd.DataFrame()
-
-        budget_cols = st.columns(min(len(budgets), 4))
-        for i, (cat, budget) in enumerate(budgets.items()):
-            actual = curr_month_df[curr_month_df["eff_category"] == cat]["abs_amount"].sum() \
-                if not curr_month_df.empty else 0.0
-            pct = min(actual / budget, 1.0) if budget > 0 else 0.0
-            with budget_cols[i % len(budget_cols)]:
-                st.markdown(f"**{cat}**")
-                st.progress(pct, text=f"₹{actual:,.0f} / ₹{budget:,.0f}")
-                if actual > budget:
-                    st.caption(f"🔴 Over by ₹{actual - budget:,.0f}")
-    else:
-        st.caption("No budgets set. Go to Settings → Budget to set monthly category budgets.")
