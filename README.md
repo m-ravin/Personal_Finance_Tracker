@@ -8,7 +8,7 @@ A production-quality multi-page Streamlit application for tracking personal fina
 
 - **Multi-format statement ingestion** — CSV, XLSX, and PDF with flexible column mapping and saved profiles per account
 - **Smart column detection** — auto-detects date, description, debit/credit, amount, and sign columns; supports Indian bank formats (HDFC, ICICI, SBI, Axis, etc.)
-- **Credit card support** — handles single-amount + sign column (e.g. `BillingAmountSign`) formats; blank sign = debit, CR = credit
+- **Credit card support** — handles single-amount + sign column (e.g. `BillingAmountSign`) formats; explicit `CR`/`DR` in sign column overrides; otherwise positive amount → credit, negative → debit
 - **Reconciliation engine** — three engines: internal transfers (bank ↔ bank), CC bill payments (bank debit ↔ CC credit), and personal loans (fuzzy contact matching)
 - **Smart categorisation** — three-tier pipeline: exact keyword match → fuzzy match (rapidfuzz ≥ 75) → optional LLM (Claude / OpenAI / Groq)
 - **Interactive dashboard** — KPIs, cash flow, treemap, savings rate, budget vs actual, insights cards, and click-through drill-down

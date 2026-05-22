@@ -301,12 +301,11 @@ def apply_mapping(
         if "credit" in field_to_col:
             credit = parse_amount(row.get(field_to_col["credit"]))
 
-        # Single-amount column + transaction_type column
+        # Single-amount column + optional transaction_type column
         # (e.g. CC statements: Amount(in Rs) + BillingAmountSign = "CR" / blank)
         if debit is None and credit is None and "amount" in field_to_col:
             amt = parse_amount(row.get(field_to_col["amount"]))
             if amt is not None:
-                amt = abs(amt)
                 tx_type = ""
                 if "transaction_type" in field_to_col:
                     _raw = row.get(field_to_col["transaction_type"])
@@ -318,12 +317,15 @@ def apply_mapping(
                         if tx_type in ("NAN", "NONE", "N/A", "NA", "-", ""):
                             tx_type = ""
                 if tx_type in ("CR", "CREDIT", "C"):
-                    credit = amt
+                    credit = abs(amt)
                 elif tx_type in ("DR", "DEBIT", "D"):
-                    debit = amt
+                    debit = abs(amt)
+                elif amt >= 0:
+                    # No explicit sign column: positive value = credit
+                    credit = amt
                 else:
-                    # Blank or unknown = debit (CC convention: purchases have no sign)
-                    debit = amt
+                    # No explicit sign column: negative value = debit
+                    debit = abs(amt)
 
         # Fallback: unmapped column whose name looks like an amount column.
         # Checks transaction_type (BillingAmountSign) first for CC statements;
