@@ -110,7 +110,7 @@ with st.sidebar:
 
     min_dt = all_df_raw["date"].min().date()
     max_dt = all_df_raw["date"].max().date()
-    default_start = date(max_dt.year, 1, 1)
+    default_start = max(date(max_dt.year, 1, 1), min_dt)
 
     date_range = st.date_input(
         "Date Range",

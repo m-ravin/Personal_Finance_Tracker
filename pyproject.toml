@@ -19,3 +19,9 @@ dependencies = [
     "streamlit>=1.55.0",
     "thefuzz>=0.22.1",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
