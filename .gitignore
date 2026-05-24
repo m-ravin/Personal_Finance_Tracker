@@ -19,3 +19,4 @@ data/finance.db-wal
 
 # Claude Code memory / session files
 .claude/
+*log.txt
