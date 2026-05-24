@@ -18,6 +18,7 @@ st.set_page_config(
 
 from core.database import (
     upsert_transactions,
+    delete_by_source_file,
     get_column_mapping,
     save_column_mapping,
     init_db,
@@ -158,6 +159,15 @@ for uploaded_file in uploaded_files:
         "account_type": "🏷️ Account Type",
     }
 
+    # ── Overwrite toggle ────────────────────────────────────────────────────
+    overwrite = st.checkbox(
+        "♻️ Overwrite existing data from this file",
+        value=False,
+        key=f"overwrite_{uploaded_file.name}",
+        help="Delete all previously imported rows from this file, then re-import fresh. "
+             "Use this when the file has been corrected or extended.",
+    )
+
     # ── Auto-import banner ──────────────────────────────────────────────────
     auto_submitted = False
     auto_mapping = {}
@@ -284,13 +294,20 @@ for uploaded_file in uploaded_files:
 
         with st.spinner("Saving to database…"):
             try:
+                if overwrite:
+                    deleted = delete_by_source_file(uploaded_file.name)
+                    if deleted:
+                        st.info(f"♻️ Removed {deleted} existing rows from **{uploaded_file.name}** before re-importing.")
                 inserted = upsert_transactions(valid_rows)
             except Exception as e:
                 st.error(f"❌ Database error: {e}")
                 continue
 
         stats = get_preview_stats(valid_rows)
-        st.success(f"✅ Imported **{inserted}** new transactions ({len(valid_rows) - inserted} duplicates skipped)")
+        if overwrite:
+            st.success(f"✅ Re-imported **{inserted}** transactions from {uploaded_file.name}")
+        else:
+            st.success(f"✅ Imported **{inserted}** new transactions ({len(valid_rows) - inserted} duplicates skipped)")
 
         stat_cols = st.columns(5)
         stat_cols[0].metric("Total Rows", stats["count"])

@@ -133,6 +133,21 @@ def generate_id() -> str:
 
 # ── Transactions ──────────────────────────────────────────────────────────────
 
+def delete_by_source_file(source_file: str) -> int:
+    """Soft-delete all non-deleted transactions from a given source file.
+    Returns the number of rows marked deleted."""
+    with get_session() as session:
+        result = session.execute(
+            text(
+                "UPDATE transactions SET is_deleted=1 "
+                "WHERE source_file=:sf AND is_deleted=0"
+            ),
+            {"sf": source_file},
+        )
+        session.commit()
+        return result.rowcount
+
+
 def upsert_transactions(rows: List[Dict[str, Any]]) -> int:
     """
     Insert transactions that don't already exist (dedup on date+description+amount).

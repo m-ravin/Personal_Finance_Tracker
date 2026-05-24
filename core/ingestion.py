@@ -36,7 +36,14 @@ def try_parse_date(val: Any) -> Optional[date]:
     s = str(val).strip()
     if not s or s.lower() in ("nan", "nat", "none", "-", "n/a", ""):
         return None
-    # pandas may give Timestamp
+    # Explicit formats first so DD/MM/YYYY is unambiguous. pd.to_datetime's
+    # dayfirst=True is a hint only and silently mis-parses "12/03/2026" as Dec 3.
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    # Fallback for unusual formats not covered by the explicit list above
     try:
         ts = pd.to_datetime(s, dayfirst=True)
         if pd.isnull(ts):
@@ -44,11 +51,6 @@ def try_parse_date(val: Any) -> Optional[date]:
         return ts.date()
     except Exception:
         pass
-    for fmt in DATE_FORMATS:
-        try:
-            return datetime.strptime(s, fmt).date()
-        except ValueError:
-            continue
     return None
 
 
