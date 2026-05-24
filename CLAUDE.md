@@ -15,7 +15,7 @@ uv add <package>                 # add a new dependency
 ### Tests
 
 ```bash
-# Run full suite (86 tests)
+# Run full suite (89 tests)
 .venv\Scripts\python.exe -m pytest tests/ -v
 
 # Individual test files
@@ -38,8 +38,8 @@ This is a **multi-page Streamlit app** with a clear pipeline: Upload → Reconci
 
 | Module | Responsibility |
 |--------|---------------|
-| `database.py` | SQLAlchemy schema + all CRUD. Single SQLite file at `data/finance.db`. WAL mode enabled. Two main tables: `transactions` and `reconciliation_pairs`. |
-| `ingestion.py` | CSV/XLSX/PDF parsers + column auto-mapping. Saves mapping profiles per `account_name` so repeat uploads need no reconfiguration. |
+| `database.py` | SQLAlchemy schema + all CRUD. Single SQLite file at `data/finance.db`. WAL mode enabled. Two main tables: `transactions` and `reconciliation_pairs`. Key helpers: `upsert_transactions`, `delete_by_source_file` (soft-delete all rows for a file, used by the overwrite-on-reupload flow). |
+| `ingestion.py` | CSV/XLSX/PDF parsers + column auto-mapping. Saves mapping profiles per `account_name` so repeat uploads need no reconfiguration. `try_parse_date` tries explicit `strptime` formats (DD/MM/YYYY first) before falling back to `pd.to_datetime` — avoids ambiguous month/day swaps. |
 | `reconciliation.py` | Three matching engines: internal transfers (±3 days, 0.5% tolerance), CC payments (±5 days), and personal loans (fuzzy contact matching ≥ 80). |
 | `categorisation.py` | Four-step pipeline: DB override → exact keyword match → rapidfuzz token_sort_ratio ≥ 75 → LLM → "Uncategorised". Categories cached in module globals; call `reload_categories()` after any write. |
 | `llm.py` | Multi-provider abstraction (Anthropic / OpenAI / Groq). LLM is entirely optional; keyword+fuzzy is the default path. |
@@ -52,6 +52,8 @@ This is a **multi-page Streamlit app** with a clear pipeline: Upload → Reconci
 - **Reconciliation exclusion**: Approved pairs set `reconciliation_status = 'approved'` on both transactions. Dashboard filters these out by default.
 - **CC sign-column logic**: For CC statements with a single amount column, three-layer detection applies: auto-map → CC heuristic scan → fallback. If a sign column is present and contains `CR`/`CREDIT` → credit; `DR`/`DEBIT` → debit. If no sign column (or the column holds non-CR/DR values like "Chip and PIN"), the raw amount sign is used: positive → credit, negative → debit.
 - **Column mapping profiles**: Persisted per `account_name` in the DB. Re-uploading the same account reuses the saved profile; new columns (e.g. sign column) trigger auto-correction.
+- **Overwrite on re-upload**: The Upload page has an "♻️ Overwrite existing data from this file" checkbox. When checked, `delete_by_source_file(filename)` soft-deletes all existing rows for that file before re-inserting, allowing corrected or extended statements to replace stale data cleanly.
+- **Date parsing**: `try_parse_date` in `ingestion.py` always tries the explicit format list (`%d/%m/%Y` before `%m/%d/%Y`) first. `pd.to_datetime(dayfirst=True)` is only a hint and will mis-parse ambiguous dates like `12/03/2026` as December 3 if reached first.
 
 ### Categories
 

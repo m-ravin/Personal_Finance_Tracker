@@ -34,7 +34,7 @@ uv run streamlit run app.py
 <!-- AUTO-GENERATED from tests/ -->
 | Command | Scope |
 |---------|-------|
-| `.venv\Scripts\python.exe -m pytest tests/ -v` | Full suite (86 tests) |
+| `.venv\Scripts\python.exe -m pytest tests/ -v` | Full suite (89 tests) |
 | `.venv\Scripts\python.exe -m pytest tests/test_ingestion_sign.py` | CC sign-logic unit tests |
 | `.venv\Scripts\python.exe -m pytest tests/test_sample_files.py` | Real-file integration (HSBC + CC CSV) |
 | `.venv\Scripts\python.exe -m pytest tests/test_dashboard_date_range.py` | Dashboard date-range clamping |
@@ -62,11 +62,12 @@ All three are optional. Without them the app uses keyword + fuzzy matching only.
 
 ## Key Conventions
 
-- **Never hard-delete** transactions — use the Settings → Data Management purge path only
+- **Never hard-delete** transactions — use the Settings → Data Management purge path only; `delete_by_source_file()` is the one exception and soft-deletes only
 - **`final_category`** is the user override; `category` is the auto-detected value. Both must be preserved
 - **`st.set_page_config()`** must be the first Streamlit call in every page file
 - **`categorisation.reload_categories()`** must be called after any write to `data/categories.json`
 - All DB-level tests should use in-memory data (pandas DataFrames), not the live `data/finance.db`
+- **Date parsing**: always use `try_parse_date` from `ingestion.py`; never call `pd.to_datetime` directly for user-supplied date strings — `dayfirst=True` is not strict and will mis-parse DD/MM/YYYY dates
 
 ## PR Checklist
 

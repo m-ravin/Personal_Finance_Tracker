@@ -7,7 +7,8 @@ A production-quality multi-page Streamlit application for tracking personal fina
 ## Features
 
 - **Multi-format statement ingestion** — CSV, XLSX, and PDF with flexible column mapping and saved profiles per account
-- **Smart column detection** — auto-detects date, description, debit/credit, amount, and sign columns; supports Indian bank formats (HDFC, ICICI, SBI, Axis, etc.)
+- **Smart column detection** — auto-detects date, description, debit/credit, amount, and sign columns; supports Indian bank formats (HDFC, ICICI, SBI, Axis, etc.) and UK/European DD/MM/YYYY date formats
+- **Overwrite on re-upload** — an optional checkbox soft-deletes all existing rows for a file before re-importing, so corrected or extended statements replace stale data cleanly
 - **Credit card support** — handles single-amount + sign column (e.g. `BillingAmountSign`) formats; explicit `CR`/`DR` in sign column overrides; otherwise positive amount → credit, negative → debit
 - **Reconciliation engine** — three engines: internal transfers (bank ↔ bank), CC bill payments (bank debit ↔ CC credit), and personal loans (fuzzy contact matching)
 - **Smart categorisation** — three-tier pipeline: exact keyword match → fuzzy match (rapidfuzz ≥ 75) → optional LLM (Claude / OpenAI / Groq)
@@ -71,7 +72,7 @@ Personal_Finance_Tracker/
 ## Pages
 
 ### 1. Upload
-Upload one or more statement files. The app auto-detects column mappings and saves them per account name so future uploads need no manual configuration. Shows a preview of imported transactions with totals and triggers automatic reconciliation scanning after each import.
+Upload one or more statement files. The app auto-detects column mappings and saves them per account name so future uploads need no manual configuration. An **"♻️ Overwrite existing data"** checkbox lets you replace a previously imported file's rows entirely — useful when a statement has been corrected or extended. Shows a preview of imported transactions with totals and triggers automatic reconciliation scanning after each import.
 
 ### 2. Reconcile
 Three reconciliation workflows:
@@ -276,6 +277,8 @@ GROQ_API_KEY=gsk_...
 6. **Investment exclusion** — a sidebar toggle separates investment spend from day-to-day expenses without deleting or re-categorising any data.
 7. **LLM is entirely optional** — if disabled, categorisation falls back to keyword → fuzzy → Uncategorised.
 8. **Prior period comparison** — KPI deltas and the "vs Prior Period" insight card automatically compute the equivalent preceding date range.
+9. **DD/MM/YYYY date parsing** — explicit `strptime` formats are tried before `pd.to_datetime`; `dayfirst=True` is not strict and would silently swap month and day for dates like `12/03/2026`.
+10. **Overwrite-on-reupload** — `delete_by_source_file()` soft-deletes existing rows matched by filename before re-inserting, keeping the soft-delete invariant intact throughout.
 
 ---
 
